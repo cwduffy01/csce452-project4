@@ -30,5 +30,3 @@ def generate_launch_description():
     ld = LaunchDescription([ bag_in_arg, bag_out_arg, bag_play, bag_record, track_node, people_node, terminate_at_end ])
     return ld
     """
-
-
