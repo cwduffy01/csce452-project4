@@ -40,5 +40,7 @@ def generate_launch_description():
             output='screen',
             parameters=[{'robot_description': robot['urdf']}],
         )
-    ld = LaunchDescription([robot_state])
+    simulation = Node(package='project4', executable='sim')
+
+    ld = LaunchDescription([robot_state, simulation])
     return ld

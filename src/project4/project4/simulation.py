@@ -15,11 +15,15 @@ from project4.convert_map import get_occupancy_grid
 
 class Simulation(Node):
 
+    move_timer = 0.1
+    no_move_instruction = 0
+    vl = 0
+    vr = 0
+
     def __init__(self):
 
         super().__init__('Simulation')
         # inputs
-        # might have to change refresh time for subs / pubs
         self.vl_sub = self.create_subscription(Float64, '/vl', self.set_vl, 10)
         self.vr_sub = self.create_subscription(Float64, '/vr', self.set_vr, 10)
 
@@ -30,17 +34,21 @@ class Simulation(Node):
         # load data
         self.robot = load_disc_robot('sim_config/robot/normal.robot')
         self.world = get_occupancy_grid('sim_config/world/pillars.world')
+        self.x = self.world['initial_pose'][0]
+        self.y = self.world['initial_pose'][1]
+        self.theta = self.world['initial_pose'][2]
+
 
         # transforms
         self.world_base_broadcast = TransformBroadcaster(self) # world -> base
         # base -> laser in launch file?
 
         # robot movement (may need to change delay)
-        self.robot_timer = self.create_timer(0.1, self.move_robot)
+        self.robot_timer = self.create_timer(self.move_timer, self.move_robot)
 
         # publish occupancy grid
         header = Header()
-        header.frame_id = 'occupancy_grid'
+        header.frame_id = 'world'
 
         metadata = MapMetaData()
         metadata.resolution = self.world['resolution']
@@ -53,21 +61,63 @@ class Simulation(Node):
         og.data = self.world['map']
 
         self.occupancy_pub.publish(og)
-        print(og)
+        # print(og)
 
     def set_vl(self, msg):
         self.vl = msg
+        self.no_move_instruction = 0
 
     def set_vr(self, msg):
         self.vr = msg
+        self.no_move_instruction = 0
 
     def move_robot(self):
-        # compute new state
-        move_x = 1.0
-        move_y = 1.0
+        # if no instruction for 1 second, dont move
+        # if(self.no_move_instruction >= 1/self.move_timer):
+        #     return
 
-        theta_x = 1.0
-        theta_y = 1.0
+        self.vl = 0.1
+        self.vr = 0.2
+        # compute new state
+        print(f'current state: ({self.x}, {self.y}, {self.theta})')
+        l = self.robot['wheels']['distance'] # distance between wheels
+
+        if(self.vl == self.vr): # go straight
+            print('straight')
+            x = self.x + math.cos(self.theta) * self.vl * self.move_timer
+            y = self.y + math.sin(self.theta) * self.vl * self.move_timer
+            new_state = [x, y, self.theta]
+
+        elif(self.vl == self.vr * -1): # turn in place
+            print('turn')
+            w = (self.vr - self.vl) / l
+            theta = self.theta + w * self.move_timer
+            new_state = [self.x, self.y, theta]
+
+        else:
+            print('big')
+            R = l/2 * (self.vr + self.vl) / (self.vr - self.vl) # distance to ICC
+            w = (self.vr - self.vl) / l # angular velocity around ICC
+            c = [self.x - R * math.sin(self.theta), self.y + R * math.cos(self.theta)] # location of ICC
+            m1 = np.matrix([
+                [math.cos(w*self.move_timer), -1 * math.sin(w*self.move_timer), 0],
+                [math.sin(w*self.move_timer), math.cos(w*self.move_timer), 0],
+                [0, 0, 1]])
+            v1 = np.matrix([[self.x - c[0]],
+                            [self.y - c[1]], 
+                            [self.theta]])
+            v2 = np.matrix([[c[0]], 
+                            [c[1]], 
+                            [w*self.move_timer]])
+            new_state = m1 * v1 + v2
+            new_state = new_state.flatten().tolist()[0]
+        
+        print(f'new state: ({new_state[0]}, {new_state[1]}, {new_state[2]})')
+
+        # do collision detection
+        self.x = new_state[0]
+        self.y = new_state[1]
+        self.theta = new_state[2]
 
         t = TransformStamped()
 
@@ -75,16 +125,18 @@ class Simulation(Node):
         t.header.frame_id = 'world'
         t.child_frame_id = 'base'
 
-        t.transform.translation.x = move_x
-        t.transform.translation.y = move_y
+        t.transform.translation.x = self.x
+        t.transform.translation.y = self.y
         t.transform.translation.z = 0.0
 
-        t.transform.rotation.x = theta_x
-        t.transform.rotation.y = theta_y
-        t.transform.rotation.z = 0.0
+        t.transform.rotation.x = 0.0
+        t.transform.rotation.y = 0.0
+        t.transform.rotation.z = self.theta
         t.transform.rotation.w = 0.0
 
         self.world_base_broadcast.sendTransform(t)
+
+        self.no_move_instruction += 1
 
 def main():
     rclpy.init()
