@@ -40,7 +40,6 @@ def generate_launch_description():
             output='screen',
             parameters=[{'robot_description': robot['urdf']}],
         )
-    # simulation = Node(package='project4', executable='sim')
 
     sim_node = Node(package='project4', executable='sim')   # node for tracking people
 
