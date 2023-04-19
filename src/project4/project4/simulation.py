@@ -70,7 +70,6 @@ class Simulation(Node):
 
         # robot movement (may need to change delay)
         self.robot_timer = self.create_timer(self.move_timer, self.move_robot)
-        # self.lidar_timer = self.create_timer(0.1, self.lidar_frame_callback)
 
         # publish occupancy grid
         header = Header()
@@ -102,7 +101,7 @@ class Simulation(Node):
         # if(self.no_move_instruction >= 1/self.move_timer):
         #     return
 
-        self.vl = 0.1
+        self.vl = 0.2
         self.vr = 0.2
         # compute new state
         print(f'current state: ({self.x}, {self.y}, {self.theta})')
@@ -165,22 +164,6 @@ class Simulation(Node):
         self.world_base_broadcast.sendTransform(t)
 
         self.no_move_instruction += 1
-
-    def lidar_frame_callback(self):
-        t = TransformStamped()
-
-        t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = 'base_link'
-        t.child_frame_id = 'lidar'
-        t.transform.translation.x = 0.0
-        t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.0
-        t.transform.rotation.x = 0.0
-        t.transform.rotation.y = 0.0
-        t.transform.rotation.z = 0.0
-        t.transform.rotation.w = 1.0
-
-        self.world_base_broadcast.sendTransform(t)
 
 def main():
     rclpy.init()
