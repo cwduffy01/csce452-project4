@@ -32,15 +32,17 @@ def generate_launch_description():
     ld = LaunchDescription([ bag_in_arg, bag_out_arg, bag_play, bag_record, track_node, people_node, terminate_at_end ])
     return ld
     """
-    robot = load_disc_robot('sim_config/robot/normal.robot')
-    robot_state = Node(
-            package='robot_state_publisher',
-            executable='robot_state_publisher',
-            name='robot_state_publisher',
-            output='screen',
-            parameters=[{'robot_description': robot['urdf']}],
-        )
-    simulation = Node(package='project4', executable='sim')
+    # robot = load_disc_robot('sim_config/robot/normal.robot')
+    # robot_state = Node(
+    #         package='robot_state_publisher',
+    #         executable='robot_state_publisher',
+    #         name='robot_state_publisher',
+    #         output='screen',
+    #         parameters=[{'robot_description': robot['urdf']}],
+    #     )
+    # simulation = Node(package='project4', executable='sim')
 
-    ld = LaunchDescription([robot_state, simulation])
+    sim_node = Node(package='project4', executable='sim')   # node for tracking people
+
+    ld = LaunchDescription([sim_node])
     return ld
