@@ -49,6 +49,15 @@ class Simulation(Node):
     def __init__(self):
 
         super().__init__('Simulation')
+
+        self.declare_parameters(
+            namespace='',
+            parameters=[
+                ('robot_file', "STRING"),
+                ('world_file', "STRING")
+            ]
+        )
+
         # inputs
         self.vl_sub = self.create_subscription(Float64, '/vl', self.set_vl, 10)
         self.vr_sub = self.create_subscription(Float64, '/vr', self.set_vr, 10)
@@ -58,8 +67,8 @@ class Simulation(Node):
         self.laser_pub = self.create_publisher(LaserScan, '/scan', 10)
 
         # load data
-        self.robot = load_disc_robot('sim_config/robot/normal.robot')
-        self.world, world_string = get_occupancy_grid('sim_config/world/pillars.world')
+        self.robot = load_disc_robot(self.get_parameter('robot_file').value)
+        self.world, world_string = get_occupancy_grid(self.get_parameter('world_file').value)
         self.obstacle_lines = vectorize(world_string, self.world['resolution'])
 
         print(self.obstacle_lines)
@@ -95,11 +104,11 @@ class Simulation(Node):
         # print(og)
 
     def set_vl(self, msg):
-        self.vl = msg
+        self.vl = msg.data
         self.no_move_instruction = 0
 
     def set_vr(self, msg):
-        self.vr = msg
+        self.vr = msg.data
         self.no_move_instruction = 0
 
     def move_robot(self):
@@ -107,8 +116,8 @@ class Simulation(Node):
         # if(self.no_move_instruction >= 1/self.move_timer):
         #     return
 
-        self.vl = 0.4
-        self.vr = 0.3
+        # self.vl = 0.4
+        # self.vr = 0.3
         # compute new state
         print(f'current state: ({self.x}, {self.y}, {self.theta})')
         l = self.robot['wheels']['distance'] # distance between wheels

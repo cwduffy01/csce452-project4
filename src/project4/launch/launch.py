@@ -9,29 +9,24 @@ from project4.disc_robot import load_disc_robot
 
 def generate_launch_description():
 
-    ## PROJECT 3 LAUNCH FILE CODE ##
-
-    """
-    # initialize command line arguments
     bag_in_value = LaunchConfiguration('bag_in')
-    bag_in_arg = DeclareLaunchArgument('bag_in', default_value="bags/example1/")
+    bag_in_arg = DeclareLaunchArgument('bag_in', default_value="bags/input1/")
 
     bag_out_value = LaunchConfiguration('bag_out')
-    bag_out_arg = DeclareLaunchArgument('bag_out', default_value="output/")
+    bag_out_arg = DeclareLaunchArgument('bag_out', default_value="bags/output/")
+    
+    robot_value = LaunchConfiguration('robot_file')
+    robot_arg = DeclareLaunchArgument('robot_file', default_value="sim_config/robot/normal.robot")
+
+    world_value = LaunchConfiguration('world_file')
+    world_arg = DeclareLaunchArgument('world_file', default_value="sim_config/world/rectangle.world")
 
     bag_play = ExecuteProcess(cmd=['ros2', 'bag', 'play', bag_in_value])     # command for playing bag file (with argument)
     bag_record = ExecuteProcess(cmd=['ros2', 'bag', 'record', "-a", "-o", bag_out_value ])   # command for recording bag file (with argument)
-    track_node = Node(package='project3', executable='track')   # node for tracking people
-    people_node = Node(package='project3', executable='people') # node for identifying people
 
-    # handle terminating
     event_handler = OnProcessExit(target_action=bag_play, on_exit=[EmitEvent(event=Shutdown())])
     terminate_at_end = RegisterEventHandler(event_handler)
 
-    # generate launch description and return
-    ld = LaunchDescription([ bag_in_arg, bag_out_arg, bag_play, bag_record, track_node, people_node, terminate_at_end ])
-    return ld
-    """
     robot = load_disc_robot('sim_config/robot/normal.robot')
     robot_state_node = Node(
             package='robot_state_publisher',
@@ -41,7 +36,11 @@ def generate_launch_description():
             parameters=[{'robot_description': robot['urdf']}],
         )
 
-    sim_node = Node(package='project4', executable='sim')   # node for tracking people
+    sim_node = Node(
+        package='project4', 
+        executable='sim',
+        parameters=[{"robot_file": robot_value}, {"world_file": world_value}]
+    )
 
-    ld = LaunchDescription([sim_node, robot_state_node])
+    ld = LaunchDescription([bag_in_arg, bag_out_arg, robot_arg, world_arg, bag_play, bag_record, sim_node, robot_state_node, terminate_at_end])
     return ld
