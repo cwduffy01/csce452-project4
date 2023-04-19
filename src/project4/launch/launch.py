@@ -33,14 +33,15 @@ def generate_launch_description():
     return ld
     """
     robot = load_disc_robot('sim_config/robot/normal.robot')
-    robot_state = Node(
+    robot_state_node = Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
             name='robot_state_publisher',
             output='screen',
             parameters=[{'robot_description': robot['urdf']}],
         )
-    simulation = Node(package='project4', executable='sim')
 
-    ld = LaunchDescription([robot_state, simulation])
+    sim_node = Node(package='project4', executable='sim')   # node for tracking people
+
+    ld = LaunchDescription([sim_node, robot_state_node])
     return ld

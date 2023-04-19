@@ -14,6 +14,31 @@ from project4.disc_robot import load_disc_robot
 from project4.convert_map import get_occupancy_grid, vectorize
 from project4.line_intersection import line_ray_intersection, point_line_distance
 
+# convert roll pitch and yaw to a quaternion
+def quaternion_from_euler(ai, aj, ak):
+    ai /= 2.0
+    aj /= 2.0
+    ak /= 2.0
+    ci = math.cos(ai)
+    si = math.sin(ai)
+    cj = math.cos(aj)
+    sj = math.sin(aj)
+    ck = math.cos(ak)
+    sk = math.sin(ak)
+    cc = ci*ck
+    cs = ci*sk
+    sc = si*ck
+    ss = si*sk
+
+    q = np.empty((4, ))
+    q[0] = cj*sc - sj*cs
+    q[1] = cj*ss + sj*cc
+    q[2] = cj*cs - sj*sc
+    q[3] = cj*cc + sj*ss
+
+    return q
+
+
 class Simulation(Node):
 
     move_timer = 0.1
@@ -82,7 +107,7 @@ class Simulation(Node):
         # if(self.no_move_instruction >= 1/self.move_timer):
         #     return
 
-        self.vl = 0.1
+        self.vl = 0.2
         self.vr = 0.2
         # compute new state
         print(f'current state: ({self.x}, {self.y}, {self.theta})')
@@ -136,16 +161,18 @@ class Simulation(Node):
 
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = 'world'
-        t.child_frame_id = 'base'
+        t.child_frame_id = 'base_link'
 
         t.transform.translation.x = self.x
         t.transform.translation.y = self.y
         t.transform.translation.z = 0.0
 
-        t.transform.rotation.x = 0.0
-        t.transform.rotation.y = 0.0
-        t.transform.rotation.z = self.theta
-        t.transform.rotation.w = 0.0
+        quat = quaternion_from_euler(0, 0, self.theta)
+
+        t.transform.rotation.x = quat[0]
+        t.transform.rotation.y = quat[1]
+        t.transform.rotation.z = quat[2]
+        t.transform.rotation.w = quat[3]
 
         self.world_base_broadcast.sendTransform(t)
 
