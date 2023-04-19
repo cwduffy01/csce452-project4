@@ -16,6 +16,7 @@ def subtract_rows(str1, str2):
 # vectorize the map
 def vectorize(raw_map, resolution):
     number_map = raw_map.replace("#", "1").replace(".", "0").split('\n')
+    number_map = list(filter(lambda x: x != '', number_map))
     width = len(number_map[0])
     height = len(number_map)
 
@@ -117,6 +118,7 @@ def vectorize(raw_map, resolution):
 def get_occupancy_grid(file_name):
     with open(file_name) as f:
         world = yaml.safe_load(f)
+    world_string = world['map']
     world_map = world['map'].split('\n')
 
     for i in range(len(world_map)):
@@ -128,10 +130,8 @@ def get_occupancy_grid(file_name):
     world['height'] = len(world_map)
     world['width'] = len(world_map[0])
     world['map'] = world_map.flatten().tolist()
-
-    # vectorize
     
-    return world
+    return world, world_string
 
     
 

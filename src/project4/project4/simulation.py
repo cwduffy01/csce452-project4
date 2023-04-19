@@ -11,7 +11,8 @@ from tf2_ros import TransformBroadcaster
 from geometry_msgs.msg import TransformStamped
 
 from project4.disc_robot import load_disc_robot
-from project4.convert_map import get_occupancy_grid
+from project4.convert_map import get_occupancy_grid, vectorize
+from project4.line_intersection import line_ray_intersection, point_line_distance
 
 class Simulation(Node):
 
@@ -33,7 +34,12 @@ class Simulation(Node):
 
         # load data
         self.robot = load_disc_robot('sim_config/robot/normal.robot')
-        self.world = get_occupancy_grid('sim_config/world/pillars.world')
+        self.world, world_string = get_occupancy_grid('sim_config/world/pillars.world')
+        self.obstacle_lines = vectorize(world_string, self.world['resolution'])
+
+        print(self.obstacle_lines)
+
+        # set intial pose
         self.x = self.world['initial_pose'][0]
         self.y = self.world['initial_pose'][1]
         self.theta = self.world['initial_pose'][2]
@@ -115,6 +121,13 @@ class Simulation(Node):
         print(f'new state: ({new_state[0]}, {new_state[1]}, {new_state[2]})')
 
         # do collision detection
+        for line in self.obstacle_lines:
+            dist = point_line_distance(line[0], line[1], line[2], line[3], new_state[0], new_state[1])
+            if dist < self.robot['body']['radius']:
+                print('crash')
+                return
+
+        print(new_state)
         self.x = new_state[0]
         self.y = new_state[1]
         self.theta = new_state[2]
