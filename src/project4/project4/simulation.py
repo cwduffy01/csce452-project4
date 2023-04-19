@@ -70,7 +70,7 @@ class Simulation(Node):
 
         # robot movement (may need to change delay)
         self.robot_timer = self.create_timer(self.move_timer, self.move_robot)
-        self.lidar_timer = self.create_timer(0.1, self.lidar_frame_callback)
+        # self.lidar_timer = self.create_timer(0.1, self.lidar_frame_callback)
 
         # publish occupancy grid
         header = Header()
@@ -149,7 +149,7 @@ class Simulation(Node):
 
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = 'world'
-        t.child_frame_id = 'base'
+        t.child_frame_id = 'base_link'
 
         t.transform.translation.x = self.x
         t.transform.translation.y = self.y
@@ -170,7 +170,7 @@ class Simulation(Node):
         t = TransformStamped()
 
         t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = 'base'
+        t.header.frame_id = 'base_link'
         t.child_frame_id = 'lidar'
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
