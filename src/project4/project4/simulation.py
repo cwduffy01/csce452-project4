@@ -43,6 +43,8 @@ class Simulation(Node):
 
     move_timer = 0.1
     no_move_instruction = 0
+    vl_err = 1
+    vr_err = 1
     vl = 0
     vr = 0
 
@@ -62,20 +64,18 @@ class Simulation(Node):
         self.world, world_string = get_occupancy_grid('sim_config/world/pillars.world')
         self.obstacle_lines = vectorize(world_string, self.world['resolution'])
 
-        print(self.obstacle_lines)
-
         # set intial pose
         self.x = self.world['initial_pose'][0]
         self.y = self.world['initial_pose'][1]
         self.theta = self.world['initial_pose'][2]
 
-
         # transforms
         self.world_base_broadcast = TransformBroadcaster(self) # world -> base
         # base -> laser in launch file?
 
-        # robot movement (may need to change delay)
-        self.robot_timer = self.create_timer(self.move_timer, self.move_robot)
+        # timers
+        self.robot_timer = self.create_timer(self.move_timer, self.move_robot) # move robot
+        self.error_timer = self.create_timer(self.robot['wheels']['error_update_rate'], self.update_errors) # update wheel errors
 
         # publish occupancy grid
         header = Header()
@@ -92,7 +92,6 @@ class Simulation(Node):
         og.data = self.world['map']
 
         self.occupancy_pub.publish(og)
-        # print(og)
 
     def set_vl(self, msg):
         self.vl = msg
@@ -102,38 +101,42 @@ class Simulation(Node):
         self.vr = msg
         self.no_move_instruction = 0
 
+    def update_errors(self):
+        self.vr_err = np.random.normal(1, math.sqrt(self.robot['wheels']['error_variance_left']))
+        self.vl_err = np.random.normal(1, math.sqrt(self.robot['wheels']['error_variance_right']))
+
     def move_robot(self):
         # if no instruction for 1 second, dont move
         # if(self.no_move_instruction >= 1/self.move_timer):
         #     return
 
-        self.vl = 0.4
-        self.vr = 0.3
+        self.vl = 0.1
+        self.vr = 0.1
+
+        # account for error
+        vl = self.vl * self.vl_err
+        vr = self.vr * self.vr_err
+
         # compute new state
-        print(f'current state: ({self.x}, {self.y}, {self.theta})')
         l = self.robot['wheels']['distance'] # distance between wheels
 
-        if(self.vl == self.vr): # go straight
-            print('straight')
-            x = self.x + math.cos(self.theta) * self.vl * self.move_timer
-            y = self.y + math.sin(self.theta) * self.vl * self.move_timer
+        if(vl == vr): # go straight
+            x = self.x + math.cos(self.theta) * vl * self.move_timer
+            y = self.y + math.sin(self.theta) * vl * self.move_timer
             new_state = [x, y, self.theta]
 
-        elif(self.vl == self.vr * -1): # turn in place
-            print('turn')
-            w = (self.vr - self.vl) / l
+        elif(vl == vr * -1): # turn in place
+            w = (vr - vl) / l
             theta = self.theta + w * self.move_timer
             new_state = [self.x, self.y, theta]
 
         else:
-            print('big')
-            R = l/2 * (self.vr + self.vl) / (self.vr - self.vl) # distance to ICC
-            w = (self.vr - self.vl) / l # angular velocity around ICC
+            R = l/2 * (vr + vl) / (vr - vl) # distance to ICC
+            w = (vr - vl) / l # angular velocity around ICC
             c = [self.x - R * math.sin(self.theta), self.y + R * math.cos(self.theta)] # location of ICC
-            m1 = np.matrix([
-                [math.cos(w*self.move_timer), -1 * math.sin(w*self.move_timer), 0],
-                [math.sin(w*self.move_timer), math.cos(w*self.move_timer), 0],
-                [0, 0, 1]])
+            m1 = np.matrix([[math.cos(w*self.move_timer), -1 * math.sin(w*self.move_timer), 0],
+                            [math.sin(w*self.move_timer), math.cos(w*self.move_timer), 0],
+                            [0, 0, 1]])
             v1 = np.matrix([[self.x - c[0]],
                             [self.y - c[1]], 
                             [self.theta]])
@@ -142,8 +145,6 @@ class Simulation(Node):
                             [w*self.move_timer]])
             new_state = m1 * v1 + v2
             new_state = new_state.flatten().tolist()[0]
-        
-        print(f'new state: ({new_state[0]}, {new_state[1]}, {new_state[2]})')
 
         # do collision detection
         for line in self.obstacle_lines:
@@ -152,7 +153,6 @@ class Simulation(Node):
                 print('crash')
                 return
 
-        print(new_state)
         self.x = new_state[0]
         self.y = new_state[1]
         self.theta = new_state[2]
