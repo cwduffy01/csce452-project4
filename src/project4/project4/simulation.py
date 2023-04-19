@@ -107,8 +107,8 @@ class Simulation(Node):
         # if(self.no_move_instruction >= 1/self.move_timer):
         #     return
 
-        self.vl = 0.2
-        self.vr = 0.2
+        self.vl = 0.4
+        self.vr = 0.3
         # compute new state
         print(f'current state: ({self.x}, {self.y}, {self.theta})')
         l = self.robot['wheels']['distance'] # distance between wheels
