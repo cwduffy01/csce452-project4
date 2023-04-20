@@ -6,7 +6,8 @@ import math
 
 from std_msgs.msg import Float64, Header
 from nav_msgs.msg import OccupancyGrid, MapMetaData
-from sensor_msgs.msg import LaserScan
+from geometry_msgs.msg import Point32
+from sensor_msgs.msg import PointCloud, LaserScan
 from tf2_ros import TransformBroadcaster
 from geometry_msgs.msg import TransformStamped
 
@@ -39,6 +40,10 @@ def quaternion_from_euler(ai, aj, ak):
     return q
 
 
+def laser_scan_to_point_cloud(scan):
+    return PointCloud(header=scan.header, points = [ Point32(x=scan.ranges[i]*np.cos(scan.angle_min+i*scan.angle_increment), y=scan.ranges[i]*np.sin(scan.angle_min+i*scan.angle_increment), z=0.0) for i in range(len(scan.ranges)) ])
+
+
 class Simulation(Node):
 
     move_timer = 0.1
@@ -58,6 +63,11 @@ class Simulation(Node):
             ]
         )
 
+        # load data
+        self.robot = load_disc_robot(self.get_parameter('robot_file').value)
+        self.world, world_string = get_occupancy_grid(self.get_parameter('world_file').value)
+        self.obstacle_lines = vectorize(world_string, self.world['resolution'])
+
         # inputs
         self.vl_sub = self.create_subscription(Float64, '/vl', self.set_vl, 10)
         self.vr_sub = self.create_subscription(Float64, '/vr', self.set_vr, 10)
@@ -65,11 +75,9 @@ class Simulation(Node):
         # outputs
         self.occupancy_pub = self.create_publisher(OccupancyGrid, '/map', 10)
         self.laser_pub = self.create_publisher(LaserScan, '/scan', 10)
-
-        # load data
-        self.robot = load_disc_robot(self.get_parameter('robot_file').value)
-        self.world, world_string = get_occupancy_grid(self.get_parameter('world_file').value)
-        self.obstacle_lines = vectorize(world_string, self.world['resolution'])
+        self.laser_sub = self.create_subscription(LaserScan, '/scan', self.publish_points, 10)
+        self.pc_pub = self.create_publisher(PointCloud, '/pc', 10)
+        self.timer = self.create_timer(self.robot["laser"]["rate"], self.generate_lidar)
 
         print(self.obstacle_lines)
 
@@ -187,6 +195,35 @@ class Simulation(Node):
 
         self.no_move_instruction += 1
 
+    def generate_lidar(self): 
+        ls = LaserScan()
+
+        robot_laser = self.robot["laser"]
+
+        ls.header.frame_id = "laser" 
+
+        num_scans = robot_laser["count"]
+
+        ls.angle_min = robot_laser["angle_min"]
+        ls.angle_max = robot_laser["angle_max"]
+        ls.angle_increment = (ls.angle_max - ls.angle_min) / num_scans
+        ls.time_increment = robot_laser["rate"] / num_scans
+        ls.scan_time = 0.0
+
+        ls.range_min = robot_laser["range_min"]
+        ls.range_max = robot_laser["range_max"]
+
+        # CHANGE TO PUT POINTS ON MAP
+        ls.ranges = np.ones(num_scans, dtype=float).tolist()
+        ls.intensities = np.zeros(num_scans, dtype=float).tolist()
+
+        self.laser_pub.publish(ls)
+
+
+    def publish_points(self, msg):
+        pc = laser_scan_to_point_cloud(msg)
+        self.pc_pub.publish(pc)
+
 def main():
     rclpy.init()
     sim = Simulation()
@@ -197,7 +234,4 @@ def main():
 
 if __name__ == "__init__":
     main()
-
-
-        
-        
+                
