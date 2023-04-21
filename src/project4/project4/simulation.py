@@ -70,12 +70,15 @@ class Simulation(Node):
         self.theta = self.world['initial_pose'][2]
 
         # transforms
-        self.world_base_broadcast = TransformBroadcaster(self) # world -> base
-        # base -> laser in launch file?
+        self.world_base_broadcast = TransformBroadcaster(self)
 
         # timers
         self.robot_timer = self.create_timer(self.move_timer, self.move_robot) # move robot
         self.error_timer = self.create_timer(self.robot['wheels']['error_update_rate'], self.update_errors) # update wheel errors
+
+        # set initial error
+        self.vr_err = np.random.normal(1, math.sqrt(self.robot['wheels']['error_variance_left']))
+        self.vl_err = np.random.normal(1, math.sqrt(self.robot['wheels']['error_variance_right']))
 
         # publish occupancy grid
         header = Header()
@@ -107,11 +110,8 @@ class Simulation(Node):
 
     def move_robot(self):
         # if no instruction for 1 second, dont move
-        # if(self.no_move_instruction >= 1/self.move_timer):
-        #     return
-
-        self.vl = 0.1
-        self.vr = 0.1
+        if(self.no_move_instruction >= 1/self.move_timer):
+            return
 
         # account for error
         vl = self.vl * self.vl_err
