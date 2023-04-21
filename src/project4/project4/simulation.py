@@ -80,7 +80,9 @@ class Simulation(Node):
         self.laser_pub = self.create_publisher(LaserScan, '/scan', 10)
         # self.laser_sub = self.create_subscription(LaserScan, '/scan', self.publish_points, 10)
         self.pc_pub = self.create_publisher(PointCloud, '/pc', 10)
-        self.timer = self.create_timer(self.robot["laser"]["rate"], self.generate_lidar)
+
+        # self.timer = self.create_timer(self.robot["laser"]["rate"], self.generate_lidar)
+
 
         # set intial pose
         self.x = self.world['initial_pose'][0]
@@ -128,7 +130,7 @@ class Simulation(Node):
         #     return
 
         # self.vl = 0.4
-        # self.vr = 0.3
+        # self.vr = 0.4
         # compute new state
         l = self.robot['wheels']['distance'] # distance between wheels
 
@@ -215,18 +217,30 @@ class Simulation(Node):
 
         trans_time = rclpy.time.Time()
 
-        t = self.tf_buffer.lookup_transform(
-            "laser",
+        # transform laser position to world frame
+        laser_to_world_tf = self.tf_buffer.lookup_transform(
             "world",
+            "laser",
             trans_time)
-        
-        laser_trans = np.array([[t.transform.translation.x], [t.transform.translation.y]])
-        q = t.transform.rotation
+
+        laser_x = laser_to_world_tf.transform.translation.x
+        laser_y = laser_to_world_tf.transform.translation.y
+        q = laser_to_world_tf.transform.rotation
         laser_theta = np.arctan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y ** 2 + q.z ** 2))
 
-        rot_mat = np.array([[np.cos(laser_theta), -np.sin(laser_theta)],
-                            [np.sin(laser_theta), np.cos(laser_theta)]])
+        curr_angle = laser_theta + ls.angle_min
+        for i in range(num_scans): 
+            min_dist = float("inf")   # maybe change
+            for seg in self.obstacle_lines:
+                intersect = line_ray_intersection(laser_x, laser_y, curr_angle, *seg)
+                # self.get_logger().info("intersect distance: %d" % (intersect))
+                if intersect > ls.range_min and intersect < ls.range_max:
+                    if intersect < min_dist or min_dist == float("inf"):
+                        min_dist = intersect
+            ls.ranges.append(min_dist)
+            curr_angle += ls.angle_increment
 
+            """
         curr_angle = ls.angle_min
         for i in range(num_scans): 
             min_dist = float("inf")   # maybe change
@@ -244,17 +258,29 @@ class Simulation(Node):
                 intersect = line_ray_intersection(0, 0, curr_angle, *laser_seg)
                 # self.get_logger().info("intersect distance: %d" % (intersect))
                 if intersect > ls.range_min and intersect < ls.range_max:
-                    if intersect < min_dist or min_dist == float("inf"):
+                    if intersect < min_dist**2 or min_dist == float("inf"):
                         min_dist = intersect
-            ls.ranges.append(min_dist)
+            ls.ranges.append(math.sqrt(min_dist))
             curr_angle += ls.angle_increment
+            """
+        
+        # convert into matrices
+        # laser_trans = np.array([[t.transform.translation.x], [t.transform.translation.y]])
+        # q = t.transform.rotation
+        # laser_theta = np.arctan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y ** 2 + q.z ** 2))
+        # rot_mat = np.array([[np.cos(laser_theta), -np.sin(laser_theta)],
+        #                     [np.sin(laser_theta), np.cos(laser_theta)]])
+        # new_start = rot_mat @ np.array([[seg[0]], [seg[1]]]) + laser_trans
+        # new_end =   rot_mat @ np.array([[seg[2]], [seg[3]]]) + laser_trans
+        
 
         
         ls.header.stamp = trans_time.to_msg()
 
-        self.laser_pub.publish(ls)
         pc = laser_scan_to_point_cloud(ls)
         self.pc_pub.publish(pc)
+        self.laser_pub.publish(ls)
+        
 
 def main():
     rclpy.init()
