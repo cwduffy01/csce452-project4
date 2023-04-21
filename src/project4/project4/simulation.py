@@ -3,6 +3,7 @@ from rclpy.node import Node
 
 import numpy as np
 import math
+import time
 
 from std_msgs.msg import Float64, Header
 from nav_msgs.msg import OccupancyGrid, MapMetaData
@@ -205,8 +206,7 @@ class Simulation(Node):
         ls.angle_min = robot_laser["angle_min"]
         ls.angle_max = robot_laser["angle_max"]
         ls.angle_increment = (ls.angle_max - ls.angle_min) / num_scans
-        ls.time_increment = robot_laser["rate"] / num_scans
-        ls.scan_time = 0.0
+        ls.scan_time = 1 / robot_laser["rate"] # THIS MIGHT BE WRONG TEST IT
 
         ls.range_min = robot_laser["range_min"]
         ls.range_max = robot_laser["range_max"]
@@ -218,6 +218,7 @@ class Simulation(Node):
         trans_time = rclpy.time.Time()
 
         # transform laser position to world frame
+        start_time = time.time()
         laser_to_world_tf = self.tf_buffer.lookup_transform(
             "world",
             "laser",
@@ -273,7 +274,10 @@ class Simulation(Node):
         # new_start = rot_mat @ np.array([[seg[0]], [seg[1]]]) + laser_trans
         # new_end =   rot_mat @ np.array([[seg[2]], [seg[3]]]) + laser_trans
         
-
+        end_time = time.time()
+        time_change = (end_time - start_time) / 1000
+        self.get_logger().info(f"{start_time}, {end_time}, {time_change}")
+        ls.time_increment = time_change
         
         ls.header.stamp = trans_time.to_msg()
 
