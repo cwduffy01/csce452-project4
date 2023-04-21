@@ -206,7 +206,7 @@ class Simulation(Node):
         ls.angle_min = robot_laser["angle_min"]
         ls.angle_max = robot_laser["angle_max"]
         ls.angle_increment = (ls.angle_max - ls.angle_min) / num_scans
-        ls.scan_time = 1 / robot_laser["rate"] # THIS MIGHT BE WRONG TEST IT
+        ls.scan_time = float(robot_laser["rate"]) 
 
         ls.range_min = robot_laser["range_min"]
         ls.range_max = robot_laser["range_max"]
@@ -231,6 +231,12 @@ class Simulation(Node):
 
         curr_angle = laser_theta + ls.angle_min
         for i in range(num_scans): 
+            rand = np.random.rand()
+            if rand < self.robot['laser']['fail_probability']:
+                ls.ranges.append(float('nan'))
+                curr_angle += ls.angle_increment
+                continue
+
             min_dist = float("inf")   # maybe change
             for seg in self.obstacle_lines:
                 intersect = line_ray_intersection(laser_x, laser_y, curr_angle, *seg)
@@ -238,44 +244,13 @@ class Simulation(Node):
                 if intersect > ls.range_min**2 and intersect < ls.range_max**2:
                     if intersect < min_dist**2 or min_dist == float("inf"):
                         min_dist = intersect
-            ls.ranges.append(math.sqrt(min_dist))
+            err = np.random.normal(0, math.sqrt(self.robot['laser']['error_variance']))
+            ls.ranges.append(math.sqrt(min_dist) + err)
             curr_angle += ls.angle_increment
 
-            """
-        curr_angle = ls.angle_min
-        for i in range(num_scans): 
-            min_dist = float("inf")   # maybe change
-            for seg in self.obstacle_lines:
-                # laser_seg = seg
-
-                new_start = rot_mat @ np.array([[seg[0]], [seg[1]]]) + laser_trans
-                new_end =   rot_mat @ np.array([[seg[2]], [seg[3]]]) + laser_trans
-
-                laser_seg = (new_start[0][0], new_start[1][0], new_end[0][0], new_end[1][0])
-
-                # self.get_logger().info(f"SEG:       {seg}")
-                # self.get_logger().info(f"LASER_SEG: {laser_seg}")
-
-                intersect = line_ray_intersection(0, 0, curr_angle, *laser_seg)
-                # self.get_logger().info("intersect distance: %d" % (intersect))
-                if intersect > ls.range_min and intersect < ls.range_max:
-                    if intersect < min_dist**2 or min_dist == float("inf"):
-                        min_dist = intersect
-            ls.ranges.append(math.sqrt(min_dist))
-            curr_angle += ls.angle_increment
-            """
-        
-        # convert into matrices
-        # laser_trans = np.array([[t.transform.translation.x], [t.transform.translation.y]])
-        # q = t.transform.rotation
-        # laser_theta = np.arctan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y ** 2 + q.z ** 2))
-        # rot_mat = np.array([[np.cos(laser_theta), -np.sin(laser_theta)],
-        #                     [np.sin(laser_theta), np.cos(laser_theta)]])
-        # new_start = rot_mat @ np.array([[seg[0]], [seg[1]]]) + laser_trans
-        # new_end =   rot_mat @ np.array([[seg[2]], [seg[3]]]) + laser_trans
         
         end_time = time.time()
-        time_change = (end_time - start_time) / 1000
+        time_change = (end_time - start_time) / 1000 + float(robot_laser["rate"])
         self.get_logger().info(f"{start_time}, {end_time}, {time_change}")
         ls.time_increment = time_change
         
