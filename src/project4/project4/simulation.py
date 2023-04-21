@@ -50,8 +50,10 @@ def laser_scan_to_point_cloud(scan):
 
 class Simulation(Node):
 
-    move_timer = 0.1
-    no_move_instruction = 0
+    move_timer = 0.1 # how often the robot movement is updated
+    no_move_instruction = 0 # how many time intervals the robot has not recieved a movement command
+
+    # velocity and error of left and right wheel initialized
     vl_err = 1
     vr_err = 1
     vl = 0
@@ -81,10 +83,7 @@ class Simulation(Node):
         # outputs
         self.occupancy_pub = self.create_publisher(OccupancyGrid, '/map', 10)
         self.laser_pub = self.create_publisher(LaserScan, '/scan', 10)
-        # self.laser_sub = self.create_subscription(LaserScan, '/scan', self.publish_points, 10)
         self.pc_pub = self.create_publisher(PointCloud, '/pc', 10)
-
-        self.timer = self.create_timer(self.robot["laser"]["rate"], self.generate_lidar)
 
         # set intial pose
         self.x = self.world['initial_pose'][0]
@@ -96,6 +95,7 @@ class Simulation(Node):
 
         # timers
         self.robot_timer = self.create_timer(self.move_timer, self.move_robot) # move robot
+        self.timer = self.create_timer(self.robot["laser"]["rate"], self.generate_lidar) # send out lidar scans
         self.error_timer = self.create_timer(self.robot['wheels']['error_update_rate'], self.update_errors) # update wheel errors
 
         self.tf_buffer = Buffer()
@@ -177,6 +177,7 @@ class Simulation(Node):
             if dist < self.robot['body']['radius']:
                 return
 
+        # set new robot state
         self.x = new_state[0]
         self.y = new_state[1]
         self.theta = new_state[2]
@@ -232,6 +233,7 @@ class Simulation(Node):
             "laser",
             trans_time)
 
+        # get laser pose in relation to world frame
         laser_x = laser_to_world_tf.transform.translation.x
         laser_y = laser_to_world_tf.transform.translation.y
         q = laser_to_world_tf.transform.rotation
@@ -239,24 +241,24 @@ class Simulation(Node):
 
         curr_angle = laser_theta + ls.angle_min
         for i in range(num_scans): 
+            # failure probability
             rand = np.random.rand()
             if rand < self.robot['laser']['fail_probability']:
                 ls.ranges.append(float('nan'))
                 curr_angle += ls.angle_increment
                 continue
 
-            min_dist = float("inf")   # maybe change
+            min_dist = float("inf")
             for seg in self.obstacle_lines:
                 intersect = line_ray_intersection(laser_x, laser_y, curr_angle, *seg)
-                # self.get_logger().info("intersect distance: %d" % (intersect))
-                if intersect > ls.range_min**2 and intersect < ls.range_max**2:
-                    if intersect < min_dist**2 or min_dist == float("inf"):
+                if intersect > ls.range_min**2 and intersect < ls.range_max**2: # if intersection distance is within lidar range
+                    if intersect < min_dist**2 or min_dist == float("inf"): # if the new intersection distance is less than the minimum
                         min_dist = intersect
             err = np.random.normal(0, math.sqrt(self.robot['laser']['error_variance']))
             ls.ranges.append(math.sqrt(min_dist) + err)
             curr_angle += ls.angle_increment
 
-        
+        # add time change to the time increment for laser scan (might help it be more synchronized)
         end_time = time.time()
         time_change = (end_time - start_time) / 1000 + float(robot_laser["rate"])
         self.get_logger().info(f"{start_time}, {end_time}, {time_change}")
@@ -264,6 +266,7 @@ class Simulation(Node):
         
         ls.header.stamp = trans_time.to_msg()
 
+        # publish laser scan and point cloud
         pc = laser_scan_to_point_cloud(ls)
         self.pc_pub.publish(pc)
         self.laser_pub.publish(ls)
