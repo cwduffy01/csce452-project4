@@ -2,8 +2,6 @@ import numpy as np
 import math
 
 def magnitude(vector):
-    print(np.sqrt(np.dot(np.array(vector),np.array(vector))))
-    print(np.linalg.norm(vector))
     return np.sqrt(np.dot(np.array(vector),np.array(vector)))
 
 def norm(vector):

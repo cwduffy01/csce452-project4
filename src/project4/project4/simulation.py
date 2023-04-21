@@ -78,11 +78,9 @@ class Simulation(Node):
         # outputs
         self.occupancy_pub = self.create_publisher(OccupancyGrid, '/map', 10)
         self.laser_pub = self.create_publisher(LaserScan, '/scan', 10)
-        self.laser_sub = self.create_subscription(LaserScan, '/scan', self.publish_points, 10)
+        # self.laser_sub = self.create_subscription(LaserScan, '/scan', self.publish_points, 10)
         self.pc_pub = self.create_publisher(PointCloud, '/pc', 10)
         self.timer = self.create_timer(self.robot["laser"]["rate"], self.generate_lidar)
-
-        print(self.obstacle_lines)
 
         # set intial pose
         self.x = self.world['initial_pose'][0]
@@ -115,7 +113,6 @@ class Simulation(Node):
         og.data = self.world['map']
 
         self.occupancy_pub.publish(og)
-        # print(og)
 
     def set_vl(self, msg):
         self.vl = msg.data
@@ -133,23 +130,19 @@ class Simulation(Node):
         # self.vl = 0.4
         # self.vr = 0.3
         # compute new state
-        print(f'current state: ({self.x}, {self.y}, {self.theta})')
         l = self.robot['wheels']['distance'] # distance between wheels
 
         if(self.vl == self.vr): # go straight
-            print('straight')
             x = self.x + math.cos(self.theta) * self.vl * self.move_timer
             y = self.y + math.sin(self.theta) * self.vl * self.move_timer
             new_state = [x, y, self.theta]
 
         elif(self.vl == self.vr * -1): # turn in place
-            print('turn')
             w = (self.vr - self.vl) / l
             theta = self.theta + w * self.move_timer
             new_state = [self.x, self.y, theta]
 
         else:
-            print('big')
             R = l/2 * (self.vr + self.vl) / (self.vr - self.vl) # distance to ICC
             w = (self.vr - self.vl) / l # angular velocity around ICC
             c = [self.x - R * math.sin(self.theta), self.y + R * math.cos(self.theta)] # location of ICC
@@ -166,16 +159,13 @@ class Simulation(Node):
             new_state = m1 * v1 + v2
             new_state = new_state.flatten().tolist()[0]
         
-        print(f'new state: ({new_state[0]}, {new_state[1]}, {new_state[2]})')
 
         # do collision detection
         for line in self.obstacle_lines:
             dist = point_line_distance(line[0], line[1], line[2], line[3], new_state[0], new_state[1])
             if dist < self.robot['body']['radius']:
-                print('crash')
                 return
 
-        print(new_state)
         self.x = new_state[0]
         self.y = new_state[1]
         self.theta = new_state[2]
@@ -228,7 +218,7 @@ class Simulation(Node):
         t = self.tf_buffer.lookup_transform(
             "laser",
             "world",
-            rclpy.time.Time())
+            trans_time)
         
         laser_trans = np.array([[t.transform.translation.x], [t.transform.translation.y]])
         q = t.transform.rotation
@@ -265,12 +255,6 @@ class Simulation(Node):
         self.laser_pub.publish(ls)
         pc = laser_scan_to_point_cloud(ls)
         self.pc_pub.publish(pc)
-
-
-    def publish_points(self, msg):
-        # pc = laser_scan_to_point_cloud(msg)
-        # self.pc_pub.publish(pc)
-        pass
 
 def main():
     rclpy.init()
