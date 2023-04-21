@@ -2,12 +2,8 @@ import numpy as np
 import math
 
 def magnitude(vector):
-    print(np.sqrt(np.dot(np.array(vector),np.array(vector))))
-    print(np.linalg.norm(vector))
-    return np.sqrt(np.dot(np.array(vector),np.array(vector)))
+    return np.dot(np.array(vector),np.array(vector))
 
-def norm(vector):
-   return np.array(vector)/magnitude(np.array(vector))
 
 def line_ray_intersection(point_x, point_y, ray_direction, x1, y1, x2, y2):
     # Convert to numpy arrays
@@ -18,7 +14,7 @@ def line_ray_intersection(point_x, point_y, ray_direction, x1, y1, x2, y2):
     
     v1 = ray_origin - point1
     v2 = point2 - point1
-    v3 = np.array([-ray_direction[1], ray_direction[0]])
+    v3 = np.array([-direction_vector[1], direction_vector[0]])
     # do not divide by 0
     if np.dot(v2, v3) < 0.0001 and np.dot(v2, v3) > -0.0001:
         return -1

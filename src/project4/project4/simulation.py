@@ -3,16 +3,21 @@ from rclpy.node import Node
 
 import numpy as np
 import math
+import time
 
 from std_msgs.msg import Float64, Header
 from nav_msgs.msg import OccupancyGrid, MapMetaData
-from sensor_msgs.msg import LaserScan
+from geometry_msgs.msg import Point32, Pose
+from sensor_msgs.msg import PointCloud, LaserScan
 from tf2_ros import TransformBroadcaster
-from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import TransformStamped, PoseStamped
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
 
 from project4.disc_robot import load_disc_robot
 from project4.convert_map import get_occupancy_grid, vectorize
 from project4.line_intersection import line_ray_intersection, point_line_distance
+
 
 # convert roll pitch and yaw to a quaternion
 def quaternion_from_euler(ai, aj, ak):
@@ -39,6 +44,10 @@ def quaternion_from_euler(ai, aj, ak):
     return q
 
 
+def laser_scan_to_point_cloud(scan):
+    return PointCloud(header=scan.header, points = [ Point32(x=scan.ranges[i]*np.cos(scan.angle_min+i*scan.angle_increment), y=scan.ranges[i]*np.sin(scan.angle_min+i*scan.angle_increment), z=0.0) for i in range(len(scan.ranges)) ])
+
+
 class Simulation(Node):
 
     move_timer = 0.1
@@ -51,6 +60,20 @@ class Simulation(Node):
     def __init__(self):
 
         super().__init__('Simulation')
+
+        self.declare_parameters(
+            namespace='',
+            parameters=[
+                ('robot_file', "STRING"),
+                ('world_file', "STRING")
+            ]
+        )
+
+        # load data
+        self.robot = load_disc_robot(self.get_parameter('robot_file').value)
+        self.world, world_string = get_occupancy_grid(self.get_parameter('world_file').value)
+        self.obstacle_lines = vectorize(world_string, self.world['resolution'])
+
         # inputs
         self.vl_sub = self.create_subscription(Float64, '/vl', self.set_vl, 10)
         self.vr_sub = self.create_subscription(Float64, '/vr', self.set_vr, 10)
@@ -58,11 +81,10 @@ class Simulation(Node):
         # outputs
         self.occupancy_pub = self.create_publisher(OccupancyGrid, '/map', 10)
         self.laser_pub = self.create_publisher(LaserScan, '/scan', 10)
+        # self.laser_sub = self.create_subscription(LaserScan, '/scan', self.publish_points, 10)
+        self.pc_pub = self.create_publisher(PointCloud, '/pc', 10)
 
-        # load data
-        self.robot = load_disc_robot('sim_config/robot/normal.robot')
-        self.world, world_string = get_occupancy_grid('sim_config/world/pillars.world')
-        self.obstacle_lines = vectorize(world_string, self.world['resolution'])
+        self.timer = self.create_timer(self.robot["laser"]["rate"], self.generate_lidar)
 
         # set intial pose
         self.x = self.world['initial_pose'][0]
@@ -75,6 +97,9 @@ class Simulation(Node):
         # timers
         self.robot_timer = self.create_timer(self.move_timer, self.move_robot) # move robot
         self.error_timer = self.create_timer(self.robot['wheels']['error_update_rate'], self.update_errors) # update wheel errors
+
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # set initial error
         self.vr_err = np.random.normal(1, math.sqrt(self.robot['wheels']['error_variance_left']))
@@ -97,11 +122,11 @@ class Simulation(Node):
         self.occupancy_pub.publish(og)
 
     def set_vl(self, msg):
-        self.vl = msg
+        self.vl = msg.data
         self.no_move_instruction = 0
 
     def set_vr(self, msg):
-        self.vr = msg
+        self.vr = msg.data
         self.no_move_instruction = 0
 
     def update_errors(self):
@@ -150,7 +175,6 @@ class Simulation(Node):
         for line in self.obstacle_lines:
             dist = point_line_distance(line[0], line[1], line[2], line[3], new_state[0], new_state[1])
             if dist < self.robot['body']['radius']:
-                print('crash')
                 return
 
         self.x = new_state[0]
@@ -178,6 +202,73 @@ class Simulation(Node):
 
         self.no_move_instruction += 1
 
+    def generate_lidar(self): 
+        ls = LaserScan()
+
+        robot_laser = self.robot["laser"]
+
+        ls.header.frame_id = "laser" 
+
+        num_scans = robot_laser["count"]
+
+        ls.angle_min = robot_laser["angle_min"]
+        ls.angle_max = robot_laser["angle_max"]
+        ls.angle_increment = (ls.angle_max - ls.angle_min) / num_scans
+        ls.scan_time = float(robot_laser["rate"]) 
+
+        ls.range_min = robot_laser["range_min"]
+        ls.range_max = robot_laser["range_max"]
+
+        # CHANGE TO PUT POINTS ON MAP
+        ls.ranges = []
+        ls.intensities = np.zeros(num_scans, dtype=float).tolist()
+
+        trans_time = rclpy.time.Time()
+
+        # transform laser position to world frame
+        start_time = time.time()
+        laser_to_world_tf = self.tf_buffer.lookup_transform(
+            "world",
+            "laser",
+            trans_time)
+
+        laser_x = laser_to_world_tf.transform.translation.x
+        laser_y = laser_to_world_tf.transform.translation.y
+        q = laser_to_world_tf.transform.rotation
+        laser_theta = np.arctan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y ** 2 + q.z ** 2))
+
+        curr_angle = laser_theta + ls.angle_min
+        for i in range(num_scans): 
+            rand = np.random.rand()
+            if rand < self.robot['laser']['fail_probability']:
+                ls.ranges.append(float('nan'))
+                curr_angle += ls.angle_increment
+                continue
+
+            min_dist = float("inf")   # maybe change
+            for seg in self.obstacle_lines:
+                intersect = line_ray_intersection(laser_x, laser_y, curr_angle, *seg)
+                # self.get_logger().info("intersect distance: %d" % (intersect))
+                if intersect > ls.range_min**2 and intersect < ls.range_max**2:
+                    if intersect < min_dist**2 or min_dist == float("inf"):
+                        min_dist = intersect
+            err = np.random.normal(0, math.sqrt(self.robot['laser']['error_variance']))
+            ls.ranges.append(math.sqrt(min_dist) + err)
+            curr_angle += ls.angle_increment
+
+        
+        end_time = time.time()
+        time_change = (end_time - start_time) / 1000 + float(robot_laser["rate"])
+        self.get_logger().info(f"{start_time}, {end_time}, {time_change}")
+        ls.time_increment = time_change
+        
+        ls.header.stamp = trans_time.to_msg()
+
+        pc = laser_scan_to_point_cloud(ls)
+        self.pc_pub.publish(pc)
+        self.laser_pub.publish(ls)
+        
+
 def main():
     rclpy.init()
     sim = Simulation()
@@ -188,7 +279,4 @@ def main():
 
 if __name__ == "__init__":
     main()
-
-
-        
-        
+                
