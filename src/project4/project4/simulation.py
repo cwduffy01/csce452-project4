@@ -6,14 +6,17 @@ import math
 
 from std_msgs.msg import Float64, Header
 from nav_msgs.msg import OccupancyGrid, MapMetaData
-from geometry_msgs.msg import Point32
+from geometry_msgs.msg import Point32, Pose
 from sensor_msgs.msg import PointCloud, LaserScan
 from tf2_ros import TransformBroadcaster
-from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import TransformStamped, PoseStamped
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
 
 from project4.disc_robot import load_disc_robot
 from project4.convert_map import get_occupancy_grid, vectorize
 from project4.line_intersection import line_ray_intersection, point_line_distance
+
 
 # convert roll pitch and yaw to a quaternion
 def quaternion_from_euler(ai, aj, ak):
@@ -90,6 +93,9 @@ class Simulation(Node):
         # transforms
         self.world_base_broadcast = TransformBroadcaster(self) # world -> base
         # base -> laser in launch file?
+
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # robot movement (may need to change delay)
         self.robot_timer = self.create_timer(self.move_timer, self.move_robot)
@@ -214,15 +220,57 @@ class Simulation(Node):
         ls.range_max = robot_laser["range_max"]
 
         # CHANGE TO PUT POINTS ON MAP
-        ls.ranges = np.ones(num_scans, dtype=float).tolist()
+        ls.ranges = []
         ls.intensities = np.zeros(num_scans, dtype=float).tolist()
 
+        trans_time = rclpy.time.Time()
+
+        t = self.tf_buffer.lookup_transform(
+            "laser",
+            "world",
+            rclpy.time.Time())
+        
+        laser_trans = np.array([[t.transform.translation.x], [t.transform.translation.y]])
+        q = t.transform.rotation
+        laser_theta = np.arctan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y ** 2 + q.z ** 2))
+
+        rot_mat = np.array([[np.cos(laser_theta), -np.sin(laser_theta)],
+                            [np.sin(laser_theta), np.cos(laser_theta)]])
+
+        curr_angle = ls.angle_min
+        for i in range(num_scans): 
+            min_dist = float("inf")   # maybe change
+            for seg in self.obstacle_lines:
+                # laser_seg = seg
+
+                new_start = rot_mat @ np.array([[seg[0]], [seg[1]]]) + laser_trans
+                new_end =   rot_mat @ np.array([[seg[2]], [seg[3]]]) + laser_trans
+
+                laser_seg = (new_start[0][0], new_start[1][0], new_end[0][0], new_end[1][0])
+
+                # self.get_logger().info(f"SEG:       {seg}")
+                # self.get_logger().info(f"LASER_SEG: {laser_seg}")
+
+                intersect = line_ray_intersection(0, 0, curr_angle, *laser_seg)
+                # self.get_logger().info("intersect distance: %d" % (intersect))
+                if intersect > ls.range_min and intersect < ls.range_max:
+                    if intersect < min_dist or min_dist == float("inf"):
+                        min_dist = intersect
+            ls.ranges.append(min_dist)
+            curr_angle += ls.angle_increment
+
+        
+        ls.header.stamp = trans_time.to_msg()
+
         self.laser_pub.publish(ls)
+        pc = laser_scan_to_point_cloud(ls)
+        self.pc_pub.publish(pc)
 
 
     def publish_points(self, msg):
-        pc = laser_scan_to_point_cloud(msg)
-        self.pc_pub.publish(pc)
+        # pc = laser_scan_to_point_cloud(msg)
+        # self.pc_pub.publish(pc)
+        pass
 
 def main():
     rclpy.init()
