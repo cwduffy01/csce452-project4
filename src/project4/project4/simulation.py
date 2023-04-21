@@ -81,7 +81,7 @@ class Simulation(Node):
         # self.laser_sub = self.create_subscription(LaserScan, '/scan', self.publish_points, 10)
         self.pc_pub = self.create_publisher(PointCloud, '/pc', 10)
 
-        # self.timer = self.create_timer(self.robot["laser"]["rate"], self.generate_lidar)
+        self.timer = self.create_timer(self.robot["laser"]["rate"], self.generate_lidar)
 
 
         # set intial pose
@@ -234,10 +234,10 @@ class Simulation(Node):
             for seg in self.obstacle_lines:
                 intersect = line_ray_intersection(laser_x, laser_y, curr_angle, *seg)
                 # self.get_logger().info("intersect distance: %d" % (intersect))
-                if intersect > ls.range_min and intersect < ls.range_max:
-                    if intersect < min_dist or min_dist == float("inf"):
+                if intersect > ls.range_min**2 and intersect < ls.range_max**2:
+                    if intersect < min_dist**2 or min_dist == float("inf"):
                         min_dist = intersect
-            ls.ranges.append(min_dist)
+            ls.ranges.append(math.sqrt(min_dist))
             curr_angle += ls.angle_increment
 
             """
