@@ -2,6 +2,7 @@ import yaml
 import numpy as np
 
 # vectorize helper
+# subtracts st2 from st1 where they are both arrays of 1s and 0s
 def subtract_rows(str1, str2):
     new_arr = ""
     for i in range(len(str1)):
@@ -23,7 +24,7 @@ def vectorize(raw_map, resolution):
     dummy = np.zeros(width)
     vectors = []
 
-    # Bottom Horizontal
+    # Bottom Horizontal: subtract row below from current row to get map of spaces that need borders below the square
     b_horizontal = []
     for i in range(height):
         if i < height-1:
@@ -31,6 +32,7 @@ def vectorize(raw_map, resolution):
         else:
             b_horizontal.append(dummy)
 
+    # Converts map of bottom horizontal borders to line segments in form (x1, y1, x2, y2) and add to vector list
     for i, row in enumerate(b_horizontal):
         idx = 0
         while(idx < len(row)):
@@ -43,7 +45,7 @@ def vectorize(raw_map, resolution):
             else:
                 idx+=1
 
-    # Top Horizontal
+    # Top Horizontal: subtract row above from current row to get map of spaces that need borders above the square
     t_horizontal = []
     for i in range(height):
         if i != 0:
@@ -51,6 +53,7 @@ def vectorize(raw_map, resolution):
         else:
             t_horizontal.append(dummy)
 
+    # Converts map of top horizontal borders to line segments in form (x1, y1, x2, y2) and add to vector list
     for i, row in enumerate(t_horizontal):
         idx = 0
         while(idx < len(row)):
@@ -67,12 +70,13 @@ def vectorize(raw_map, resolution):
         number_map[i] = [c for c in number_map[i]]
     number_map = np.asarray(number_map)
 
+    # Rotate map 90 degrees to run same algorithm as above
     rotated_number_map = []
     for i in range(len(number_map[0])):
         rotated_number_map.append(''.join(map(str,number_map[:,i])))
     dummy = np.zeros(height)
 
-    # Right Vertical
+    # Right Vertical: subtract column right from current column to get map of spaces that need borders right of the square
     r_vertical = []
     for i in range(width):
         if i < width-1:
@@ -80,6 +84,7 @@ def vectorize(raw_map, resolution):
         else:
             r_vertical.append(dummy)
 
+    # Converts map of right vertical borders to line segments in form (x1, y1, x2, y2) and add to vector list
     for i, col in enumerate(r_vertical):
         idx = 0
         while(idx < len(col)):
@@ -92,7 +97,7 @@ def vectorize(raw_map, resolution):
             else:
                 idx+=1
 
-    # Left Vertical
+    # Left Vertical: subtract column left from current row to get map of spaces that need borders left of the square
     l_vertical = []
     for i in range(width):
         if i != 0:
@@ -100,6 +105,7 @@ def vectorize(raw_map, resolution):
         else:
             l_vertical.append(dummy)
 
+    # Converts map of left vertical borders to line segments in form (x1, y1, x2, y2) and add to vector list
     for i, col in enumerate(l_vertical):
         idx = 0
         while(idx < len(col)):
@@ -116,16 +122,18 @@ def vectorize(raw_map, resolution):
 
 # read map from file
 def get_occupancy_grid(file_name):
+    # read file
     with open(file_name) as f:
         world = yaml.safe_load(f)
     world_string = world['map']
+    # split at newline
     world_map = world['map'].split('\n')
 
     for i in range(len(world_map)):
-        world_map[i] = world_map[i].replace('', ' ').split(' ')[1:-1]
+        world_map[i] = world_map[i].replace('', ' ').split(' ')[1:-1] # split each character
     world_map = np.array(world_map[:-1])
-    world_map = np.where(world_map == '#', 1, 0)
-    world_map = world_map[::-1]
+    world_map = np.where(world_map == '#', 1, 0) # replace with 0s and 1s
+    world_map = world_map[::-1] # flip upside down
 
     world['height'] = len(world_map)
     world['width'] = len(world_map[0])

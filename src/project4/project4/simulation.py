@@ -182,6 +182,7 @@ class Simulation(Node):
         self.y = new_state[1]
         self.theta = new_state[2]
 
+        # transform robot position
         t = TransformStamped()
 
         t.header.stamp = self.get_clock().now().to_msg()
