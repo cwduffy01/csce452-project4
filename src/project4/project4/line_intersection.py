@@ -4,7 +4,6 @@ import math
 def magnitude(vector):
     return np.dot(np.array(vector),np.array(vector))
 
-
 def line_ray_intersection(point_x, point_y, ray_direction, x1, y1, x2, y2):
     # Convert to numpy arrays
     ray_origin = np.array([point_x, point_y], dtype=float)
