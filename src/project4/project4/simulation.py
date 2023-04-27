@@ -72,6 +72,8 @@ class Simulation(Node):
             ]
         )
 
+        # we could pass the robot_file parameter to robot_state_publisher node to do the urdf correctly
+
         # load data
         self.robot = load_disc_robot(self.get_parameter('robot_file').value)
         self.world, world_string = get_occupancy_grid(self.get_parameter('world_file').value)
@@ -223,7 +225,6 @@ class Simulation(Node):
         # create laser scan message
         ls = LaserScan()
         ls.header.frame_id = "laser" 
-        ls.header.stamp = trans_time.to_msg()
         ls.angle_min = robot_laser["angle_min"]
         ls.angle_max = robot_laser["angle_max"]
         ls.angle_increment = (ls.angle_max - ls.angle_min) / num_scans
@@ -240,6 +241,7 @@ class Simulation(Node):
             "world",
             "laser",
             trans_time)
+        ls.header.stamp = trans_time.to_msg()
 
         # get translation and rotation of laser frame
         laser_x = laser_to_world_tf.transform.translation.x

@@ -1,4 +1,5 @@
 from launch import LaunchDescription
+from launch.launch_context import LaunchContext
 from launch_ros.actions import *
 from launch.actions import *
 from launch.substitutions import *
@@ -30,7 +31,7 @@ def generate_launch_description():
     terminate_at_end = RegisterEventHandler(event_handler)
 
     # start robot node
-    robot = load_disc_robot('sim_config/robot/normal.robot')
+    robot = load_disc_robot("sim_config/robot/normal.robot")
     robot_state_node = Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
