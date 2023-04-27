@@ -47,6 +47,18 @@ def generate_launch_description():
         parameters=[{"robot_file": robot_value}, {"world_file": world_value}]
     )
 
+    # start simulation node
+    vel_node = Node(
+        package='project4', 
+        executable='vel'
+    )
+
+    # start simulation node
+    nav_node = Node(
+        package='project4', 
+        executable='nav'
+    )
+
     # launch 
-    ld = LaunchDescription([bag_in_arg, bag_out_arg, robot_arg, world_arg, bag_play, bag_record, sim_node, robot_state_node, terminate_at_end])
+    ld = LaunchDescription([bag_in_arg, bag_out_arg, robot_arg, world_arg, bag_play, bag_record, sim_node, vel_node, nav_node, robot_state_node, terminate_at_end])
     return ld

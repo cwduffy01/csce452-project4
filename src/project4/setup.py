@@ -21,7 +21,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'sim = project4.simulation:main'
+            'sim = project4.simulation:main',
+            'vel = project4.velocity_translator:main',
+            'nav = project4.navigation_controller:main'
         ],
     },
 )
