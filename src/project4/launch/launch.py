@@ -38,7 +38,8 @@ def generate_launch_description():
     # start simulation node
     vel_node = Node(
         package='project4', 
-        executable='vel'
+        executable='vel',
+        parameters=[{"robot_file": robot_value}]
     )
 
     # start simulation node

@@ -4,10 +4,22 @@ from rclpy.node import Node
 from std_msgs.msg import Float64
 from geometry_msgs.msg import Twist
 
+from project4.disc_robot import load_disc_robot
+
 class VelocityTranslator(Node):
 
     def __init__(self):
         super().__init__('VelocityTranslator')
+
+        # pull parameters from command line 
+        self.declare_parameters(
+            namespace='',
+            parameters=[
+                ('robot_file', "STRING"),
+            ]
+        )
+
+        self.robot = load_disc_robot(self.get_parameter('robot_file').value)
 
         self.vl_publisher = self.create_publisher(Float64, "/vl", 10)
         self.vr_publisher = self.create_publisher(Float64, "/vr", 10)
@@ -16,7 +28,20 @@ class VelocityTranslator(Node):
 
     # translate Twist message from cmd_vel to Float64 messages to /vl and /vr
     def translate_vel(self, msg):
-        pass
+        lin_vel = msg.linear.x
+        ang_vel = msg.angular.z
+
+        wheel_dist = self.robot['wheels']["distance"]
+
+        vel_r_msg = Float64()
+        vel_l_msg = Float64()
+        
+        # calculate left and right velocities and store in messages
+        vel_r_msg.data = lin_vel + wheel_dist * ang_vel / 2
+        vel_l_msg.data = lin_vel - wheel_dist * ang_vel / 2
+
+        self.vl_publisher.publish(vel_l_msg)
+        self.vr_publisher.publish(vel_r_msg)
 
 
 def main():
