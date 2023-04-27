@@ -7,10 +7,10 @@ import time
 
 from std_msgs.msg import Float64, Header
 from nav_msgs.msg import OccupancyGrid, MapMetaData
-from geometry_msgs.msg import Point32, Pose
+from geometry_msgs.msg import Point32
 from sensor_msgs.msg import PointCloud, LaserScan
 from tf2_ros import TransformBroadcaster
-from geometry_msgs.msg import TransformStamped, PoseStamped
+from geometry_msgs.msg import TransformStamped
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
@@ -295,4 +295,3 @@ def main():
 
 if __name__ == "__init__":
     main()
-                
