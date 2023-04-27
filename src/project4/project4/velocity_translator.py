@@ -12,7 +12,7 @@ class VelocityTranslator(Node):
         self.vl_publisher = self.create_publisher(Float64, "/vl", 10)
         self.vr_publisher = self.create_publisher(Float64, "/vr", 10)
 
-        self.cmd_vel_subscriber = self.create_publisher(Twist, "/cmd_vel", self.translate_vel, 10)
+        self.cmd_vel_subscriber = self.create_subscription(Twist, "/cmd_vel", self.translate_vel, 10)
 
     # translate Twist message from cmd_vel to Float64 messages to /vl and /vr
     def translate_vel(self, msg):

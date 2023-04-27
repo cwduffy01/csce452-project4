@@ -11,7 +11,7 @@ class NavigationController(Node):
 
         self.cmd_vel_publisher = self.create_publisher(Twist, "/cmd_vel", 10)
 
-        self.scan_subscriber = self.create_publisher(LaserScan, "/scan", self.process_lidar, 10)
+        self.scan_subscriber = self.create_subscription(LaserScan, "/scan", self.process_lidar, 10)
 
     # process lidar information and choose the best angular and linear velocity to send to /cmd_vel
     def process_lidar(self, msg):
