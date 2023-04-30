@@ -22,7 +22,7 @@ def line_ray_intersection(point_x, point_y, ray_direction, x1, y1, x2, y2):
     t2 = np.dot(v1, v3) / np.dot(v2, v3)
     if t1 >= 0.0 and t2 >= 0.0 and t2 <= 1.0:
         intersection_pt = ray_origin + t1 * direction_vector
-        return magnitude(intersection_pt - ray_origin)
+        return math.sqrt(magnitude(intersection_pt - ray_origin))
     return -1
 
 def point_line_distance(x1, y1, x2, y2, point_x, point_y):
