@@ -22,7 +22,7 @@ class NavigationController(Node):
         )
 
         self.robot = load_disc_robot(self.get_parameter('robot_file').value)
-        self.danger = self.robot['body']['radius'] + 0.1
+        self.danger = self.robot['body']['radius'] + 0.10
 
         self.cmd_vel_publisher = self.create_publisher(Twist, "/cmd_vel", 10)
 
@@ -40,17 +40,16 @@ class NavigationController(Node):
         ang_weight = 1
 
         for dist in msg.ranges:
-            angle = curr_angle
-
             if math.isnan(dist):
                 curr_angle += msg.angle_increment
                 continue
 
             if dist < self.danger:
-                angle *= -1
-
-            x_weight += dist * np.cos(angle)
-            y_weight += dist * np.sin(angle)
+                x_weight -= dist * np.cos(curr_angle) * 2
+                y_weight -= dist * np.sin(curr_angle) * 2
+            else:
+                x_weight += dist * np.cos(curr_angle)
+                y_weight += dist * np.sin(curr_angle)
 
             curr_angle += msg.angle_increment
 
