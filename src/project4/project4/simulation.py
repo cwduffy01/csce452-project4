@@ -262,14 +262,14 @@ class Simulation(Node):
             # get minimum distance for each scan 
             min_dist = float("inf")
             for seg in self.obstacle_lines:     # get point for each segment
-                intersect = line_ray_intersection(laser_x, laser_y, curr_angle, *seg)   # get distance to line segment
-                if intersect > ls.range_min**2 and intersect < ls.range_max**2:         # check within range
-                    if intersect < min_dist**2 or min_dist == float("inf"):             # check if it is lower than 
+                intersect = line_ray_intersection(laser_x, laser_y, curr_angle, *seg)  # get distance to line segment
+                if intersect > ls.range_min and intersect < ls.range_max:         # check within range
+                    if intersect < min_dist or min_dist == float("inf"):             # check if it is lower than 
                         min_dist = intersect
 
             # add scan error
             err = np.random.normal(0, math.sqrt(self.robot['laser']['error_variance']))
-            ls.ranges.append(math.sqrt(min_dist) + err)
+            ls.ranges.append(min_dist + err)
 
             # next angle
             curr_angle += ls.angle_increment
