@@ -45,7 +45,9 @@ def generate_launch_description():
     # start simulation node
     nav_node = Node(
         package='project4', 
-        executable='nav'
+        executable='nav',
+        parameters=[{"robot_file": robot_value}]
+
     )
 
     # launch 
