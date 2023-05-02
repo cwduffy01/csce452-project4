@@ -30,38 +30,38 @@ class NavigationController(Node):
 
     # process lidar information and choose the best angular and linear velocity to send to /cmd_vel
     def process_lidar(self, msg):
+        curr_angle = msg.angle_min  
 
-        curr_angle = msg.angle_min
+        # vector component values
+        vec_x = 0
+        vec_y = 0
 
-        x_weight = 0
-        y_weight = 0
-
+        # proportional measures for 
         lin_weight = 0.01
         ang_weight = 1
 
+        # sum all vectors from sensor to range point
         for dist in msg.ranges:
+
+            # if distance is infinity, ignore vector
             if math.isnan(dist):
                 curr_angle += msg.angle_increment
                 continue
 
+            # add more weight to vectors that are in the "danger zone"
             if dist < self.danger:
-                x_weight -= dist * np.cos(curr_angle) * 2
-                y_weight -= dist * np.sin(curr_angle) * 2
+                vec_x -= dist * np.cos(curr_angle) * 2
+                vec_y -= dist * np.sin(curr_angle) * 2
             else:
-                x_weight += dist * np.cos(curr_angle)
-                y_weight += dist * np.sin(curr_angle)
+                vec_x += dist * np.cos(curr_angle)
+                vec_y += dist * np.sin(curr_angle)
 
             curr_angle += msg.angle_increment
 
-        self.get_logger().info(f"x_weight: {x_weight}\ty_weight: {y_weight}\ttangent:{np.arctan2(y_weight, x_weight)}")
-        
-
-
-
-
+        # set velocities proportional to angle and magnitude of vector
         twist_msg = Twist()
-        twist_msg.angular.z = ang_weight * np.arctan2(y_weight, x_weight)
-        twist_msg.linear.x = lin_weight * np.sqrt(x_weight**2 + y_weight**2)
+        twist_msg.angular.z = ang_weight * np.arctan2(vec_y, vec_x)
+        twist_msg.linear.x = lin_weight * np.sqrt(vec_x**2 + vec_y**2)
 
         self.cmd_vel_publisher.publish(twist_msg)
 
