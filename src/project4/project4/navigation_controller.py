@@ -37,7 +37,7 @@ class NavigationController(Node):
         vec_y = 0
 
         # proportional measures for 
-        lin_weight = 0.01
+        lin_weight = 0.008
         ang_weight = 1
 
         # sum all vectors from sensor to range point
